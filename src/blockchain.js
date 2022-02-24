@@ -11,6 +11,10 @@
 const SHA256 = require('crypto-js/sha256');
 const BlockClass = require('./block.js');
 const bitcoinMessage = require('bitcoinjs-message');
+const Block = require('bitcoinjs-lib/src/block');
+
+// Decode the block body
+const hex2ascii = require('hex2ascii');
 
 class Blockchain {
 
@@ -63,8 +67,19 @@ class Blockchain {
      */
     _addBlock(block) {
         let self = this;
+        this.height = self.chain.length
+        let prevHash = self.chain[height - 1].previousBlockHash
+        
         return new Promise(async (resolve, reject) => {
-           
+            try {
+                block.previousBlockHash = prevHash
+                block.height = this.height
+                block.timestamp = Date().getTime().toString().slice(0,-3) 
+                block.hash = SHA256(block)
+                resolve(self.chain.push(block))
+            } catch(e) {
+               reject(`An Error Occurred: ${e}`) 
+            }  
         });
     }
 
@@ -78,7 +93,7 @@ class Blockchain {
      */
     requestMessageOwnershipVerification(address) {
         return new Promise((resolve) => {
-            
+            resolve(`${address}:${Date().getTime().toString().slice(0,-3)}:starRegistry`)
         });
     }
 
@@ -101,9 +116,26 @@ class Blockchain {
      */
     submitStar(address, message, signature, star) {
         let self = this;
+        let time = parseInt(message.split(':')[1])
+        let currentTime = parseInt(new Date().getTime().toString().slice(0, -3))
+        
+        let FIVE_MIN=5*60*1000
+
         return new Promise(async (resolve, reject) => {
+
+        if((currentTime - new Date(time)) < FIVE_MIN) {
+           if(bitcoinMessage.verify(message, address, signature)) {
+                // If the Bitcoin message verify returns true
+                let myBlock = new Block()
+                myBlock.body = star
+                resolve(self._addBlock(myBlock))
+           } else {
+               reject(`Message Could Not Be Verified`)
+           }
+        }
             
         });
+
     }
 
     /**
@@ -114,8 +146,12 @@ class Blockchain {
      */
     getBlockByHash(hash) {
         let self = this;
-        return new Promise((resolve, reject) => {
-           
+        return new Promise((resolve) => {
+            self.chain.filter(chainItem => {
+                if(chainItem.hash === hash) {
+                    resolve(chainItem)
+                }
+            })
         });
     }
 
@@ -146,7 +182,12 @@ class Blockchain {
         let self = this;
         let stars = [];
         return new Promise((resolve, reject) => {
-            
+            self.chain.filter(blockItem => {
+                if (hex2ascii(blockItem.body.address.toString()) ===  address) {
+                    stars.push(blockItem.body)
+                }
+
+            })
         });
     }
 
@@ -160,6 +201,21 @@ class Blockchain {
         let self = this;
         let errorLog = [];
         return new Promise(async (resolve, reject) => {
+            for(let i = 1; i <= self.chain.length; i++) {
+                if(self.chain[i].validate) {
+                    // If it validates -- do X
+                    if(self.chain[i].hash === self.chain[i - 1].previousBlockHash) {
+                        // Hashes match and chain isn't broken
+                        resolve(true)
+                    } else {
+                        reject(`Error - Chain is Broken`)
+                    }
+                } else {
+                    // Add the block to the error log
+                    errorLog.push(self.chain[i])
+                    reject(`Error`)
+                }
+            }
             
         });
     }
