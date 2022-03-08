@@ -67,16 +67,23 @@ class Blockchain {
      */
     _addBlock(block) {
         let self = this;
-        this.height = self.chain.length
-        let prevHash = self.chain[height - 1].previousBlockHash
-        
+        let prevHash = ""
+        // The blockchain initilsiation also call this function - since the hegith will be -1 we can use that to check
+        if( self.height === -1){
+            prevHash = SHA256(JSON.stringify(block)).toString()
+
+        } else {
+            prevHash = self.chain[self.chain.length -1].previousBlockHash
+        }
+ 
         return new Promise(async (resolve, reject) => {
             try {
                 block.previousBlockHash = prevHash
-                block.height = this.height
-                block.timestamp = Date().getTime().toString().slice(0,-3) 
-                block.hash = SHA256(block)
+                self.height === -1 ? block.height = 1 : block.height = self.height + 1 // If the height is -1 (Genesis Block) set it to 1 - else set it to the current height + 1
+                block.timestamp = Date.now().toString().slice(0,-3) 
+                block.hash = SHA256(JSON.stringify(block)).toString()
                 resolve(self.chain.push(block))
+                self.height = self.chain.length
             } catch(e) {
                reject(`An Error Occurred: ${e}`) 
             }  
@@ -93,7 +100,7 @@ class Blockchain {
      */
     requestMessageOwnershipVerification(address) {
         return new Promise((resolve) => {
-            resolve(`${address}:${Date().getTime().toString().slice(0,-3)}:starRegistry`)
+            resolve(`${address}:${Date.now().toString().slice(0,-3)}:starRegistry`)
         });
     }
 
@@ -126,8 +133,8 @@ class Blockchain {
         if((currentTime - new Date(time)) < FIVE_MIN) {
            if(bitcoinMessage.verify(message, address, signature)) {
                 // If the Bitcoin message verify returns true
-                let myBlock = new Block()
-                myBlock.body = star
+                const blockData = {"owner": address, "star": star}
+                const myBlock = new BlockClass.Block(blockData)
                 resolve(self._addBlock(myBlock))
            } else {
                reject(`Message Could Not Be Verified`)
@@ -146,12 +153,13 @@ class Blockchain {
      */
     getBlockByHash(hash) {
         let self = this;
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             self.chain.filter(chainItem => {
                 if(chainItem.hash === hash) {
                     resolve(chainItem)
                 }
             })
+            reject(`No items found that match the hash`)
         });
     }
 
@@ -183,11 +191,13 @@ class Blockchain {
         let stars = [];
         return new Promise((resolve, reject) => {
             self.chain.filter(blockItem => {
-                if (hex2ascii(blockItem.body.address.toString()) ===  address) {
-                    stars.push(blockItem.body)
+                const dataObj = JSON.parse(hex2ascii(blockItem.body))
+                console.log(`dataObj.owner: ${dataObj.owner}`)
+                if (dataObj.owner ===  address) {
+                    stars.push(dataObj.star)
                 }
-
             })
+            resolve(stars)
         });
     }
 
