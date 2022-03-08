@@ -139,6 +139,8 @@ class Blockchain {
            } else {
                reject(`Message Could Not Be Verified`)
            }
+        } else {
+            reject(`Older than five minutes`)
         }
             
         });
