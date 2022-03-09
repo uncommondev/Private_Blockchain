@@ -11,7 +11,6 @@
 const SHA256 = require('crypto-js/sha256');
 const BlockClass = require('./block.js');
 const bitcoinMessage = require('bitcoinjs-message');
-const Block = require('bitcoinjs-lib/src/block');
 
 // Decode the block body
 const hex2ascii = require('hex2ascii');
@@ -67,25 +66,30 @@ class Blockchain {
      */
     _addBlock(block) {
         let self = this;
-        let prevHash = ""
-        // The blockchain initilsiation also call this function - since the hegith will be -1 we can use that to check
-        if( self.height === -1){
-            prevHash = SHA256(JSON.stringify(block)).toString()
-
-        } else {
-            prevHash = self.chain[self.chain.length -1].previousBlockHash
-        }
  
         return new Promise(async (resolve, reject) => {
             try {
-                block.previousBlockHash = prevHash
-                self.height === -1 ? block.height = 1 : block.height = self.height + 1 // If the height is -1 (Genesis Block) set it to 1 - else set it to the current height + 1
-                block.timestamp = Date.now().toString().slice(0,-3) 
+                self.height === -1 ? block.previousBlockHash = null : block.previousBlockHash = self.chain[self.chain.length - 1].hash
+                console.log(`PREVIOUS HASH: ${block.previousBlockHash}`)
+                self.height === -1 ? block.height = 0 : block.height = self.height + 1 // If the height is -1 (Genesis Block) set it to 1 - else set it to the current height + 1
+                console.log(`self.height: ${self.height}`)
+                console.log(`block.height: ${block.height}`)
+                block.time = Date.now().toString().slice(0,-3) 
                 block.hash = SHA256(JSON.stringify(block)).toString()
-                resolve(self.chain.push(block))
-                self.height = self.chain.length
+                console.log(`Adding Block HASH: ${block.hash}`)
+                // Validate the chain BEFORE adding to the chain
+                if (self.chain.length !== 0 && self.validateChain() === true) {
+                    resolve(self.chain.push(block))
+                } else if (self.chain.length === 0) {
+                    // For the Genesis Block, there will be nothing validate
+                    resolve(self.chain.push(block))
+                } 
+                else {
+                    reject (`There was an error validating the chain`)
+                }
+                self.height = self.height + 1
             } catch(e) {
-               reject(`An Error Occurred: ${e}`) 
+               console.log(`An Error Occurred: ${JSON.stringify(e)}`) 
             }  
         });
     }
@@ -135,7 +139,8 @@ class Blockchain {
                 // If the Bitcoin message verify returns true
                 const blockData = {"owner": address, "star": star}
                 const myBlock = new BlockClass.Block(blockData)
-                resolve(self._addBlock(myBlock))
+                self._addBlock(myBlock)
+                resolve(myBlock)
            } else {
                reject(`Message Could Not Be Verified`)
            }
@@ -143,7 +148,7 @@ class Blockchain {
             reject(`Older than five minutes`)
         }
             
-        });
+        })
 
     }
 
@@ -194,7 +199,6 @@ class Blockchain {
         return new Promise((resolve, reject) => {
             self.chain.filter(blockItem => {
                 const dataObj = JSON.parse(hex2ascii(blockItem.body))
-                console.log(`dataObj.owner: ${dataObj.owner}`)
                 if (dataObj.owner ===  address) {
                     stars.push(dataObj.star)
                 }
@@ -209,29 +213,35 @@ class Blockchain {
      * 1. You should validate each block using `validateBlock`
      * 2. Each Block should check the with the previousBlockHash
      */
+
+    
     validateChain() {
         let self = this;
         let errorLog = [];
         return new Promise(async (resolve, reject) => {
-            for(let i = 1; i <= self.chain.length; i++) {
-                if(self.chain[i].validate) {
-                    // If it validates -- do X
-                    if(self.chain[i].hash === self.chain[i - 1].previousBlockHash) {
-                        // Hashes match and chain isn't broken
-                        resolve(true)
+            console.log(`Validate Chain Triggered`)
+            try {
+                self.chain.map((currentBlock, index, arr) => {
+                    if (currentBlock.height === 0) {
+                        currentBlock.validate() ? console.log(`Genesis Hashes Validation Passed`) : errorLog.push(currentBlock)
                     } else {
-                        reject(`Error - Chain is Broken`)
+                        console.log(`Index: ${index} - Arr - ${currentBlock.previousBlockHash} - ${arr[index - 1].hash}`)
+                        currentBlock.validate() ? console.log(`Block Validation Passed`) : console.log(`Block Validation Failed`)
+                        currentBlock.previousBlockHash !== arr[index - 1].hash ? console.log(`Hashes Dont Match`) : errorLog.push(currentBlock)
                     }
+                })   
+                // If there are any errors, return the array of errors, else, return true
+                if (errorLog.length === 0) {
+                    resolve(true)
                 } else {
-                    // Add the block to the error log
-                    errorLog.push(self.chain[i])
-                    reject(`Error`)
+                    reject(errorLog) 
                 }
+            } catch(error){
+                console.log(`Error: ${error}`)
             }
-            
-        });
+            }
+        )
     }
-
 }
 
 module.exports.Blockchain = Blockchain;   

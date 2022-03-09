@@ -1,3 +1,5 @@
+const res = require("express/lib/response");
+
 /**
  *          BlockchainController
  * 
@@ -16,9 +18,10 @@ class BlockchainController {
         this.submitStar();
         this.getBlockByHash();
         this.getStarsByOwner();
+        this.validateChain()
     }
 
-    // Enpoint to Get a Block by Height (GET Endpoint)
+    // Endpoint to Get a Block by Height (GET Endpoint)
     getBlockByHeight() {
         this.app.get("/block/height/:height", async (req, res) => {
             if(req.params.height) {
@@ -115,6 +118,20 @@ class BlockchainController {
             }
             
         });
+    }
+
+    // This endpoint allows you to validate the Blockchain
+    validateChain() {
+        this.app.get("/blocks/validate", async (req, res) => {
+
+                let valid = await this.blockchain.validateChain()
+                if (valid) {
+                    return res.status(200).send("Blockchain Validation Passed")
+                } else {
+                    return res.status(500).json(valid)
+                }
+
+        })
     }
 
 }
