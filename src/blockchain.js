@@ -4,7 +4,7 @@
  *  It uses libraries like `crypto-js` to create the hashes for each block and `bitcoinjs-message` 
  *  to verify a message signature. The chain is stored in the array
  *  `this.chain = [];`. Of course each time you run the application the chain will be empty because and array
- *  isn't a persisten storage method.
+ *  isn't a persistent storage method.
  *  
  */
 
@@ -20,7 +20,7 @@ class Blockchain {
     /**
      * Constructor of the class, you will need to setup your chain array and the height
      * of your chain (the length of your chain array).
-     * Also everytime you create a Blockchain class you will need to initialized the chain creating
+     * Also every time you create a Blockchain class you will need to initialized the chain creating
      * the Genesis Block.
      * The methods in this class will always return a Promise to allow client applications or
      * other backends to call asynchronous functions.
@@ -70,15 +70,13 @@ class Blockchain {
         return new Promise(async (resolve, reject) => {
             try {
                 self.height === -1 ? block.previousBlockHash = null : block.previousBlockHash = self.chain[self.chain.length - 1].hash
-                console.log(`PREVIOUS HASH: ${block.previousBlockHash}`)
                 self.height === -1 ? block.height = 0 : block.height = self.height + 1 // If the height is -1 (Genesis Block) set it to 1 - else set it to the current height + 1
-                console.log(`self.height: ${self.height}`)
-                console.log(`block.height: ${block.height}`)
                 block.time = Date.now().toString().slice(0,-3) 
                 block.hash = SHA256(JSON.stringify(block)).toString()
-                console.log(`Adding Block HASH: ${block.hash}`)
                 // Validate the chain BEFORE adding to the chain
-                if (self.chain.length !== 0 && self.validateChain() === true) {
+                let result = await self.validateChain()
+                // If result.length is greater than 0, it means the Blockchain could not be validated
+                if (self.chain.length !== 0 && result.length === 0) {
                     resolve(self.chain.push(block))
                 } else if (self.chain.length === 0) {
                     // For the Genesis Block, there will be nothing validate
@@ -117,7 +115,7 @@ class Blockchain {
      * 1. Get the time from the message sent as a parameter example: `parseInt(message.split(':')[1])`
      * 2. Get the current time: `let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));`
      * 3. Check if the time elapsed is less than 5 minutes
-     * 4. Veify the message with wallet address and signature: `bitcoinMessage.verify(message, address, signature)`
+     * 4. Verify the message with wallet address and signature: `bitcoinMessage.verify(message, address, signature)`
      * 5. Create the block and add it to the chain
      * 6. Resolve with the block added.
      * @param {*} address 
@@ -125,30 +123,31 @@ class Blockchain {
      * @param {*} signature 
      * @param {*} star 
      */
-    submitStar(address, message, signature, star) {
+    async submitStar(address, message, signature, star) {
         let self = this;
         let time = parseInt(message.split(':')[1])
         let currentTime = parseInt(new Date().getTime().toString().slice(0, -3))
-        
-        let FIVE_MIN=5*60*1000
 
         return new Promise(async (resolve, reject) => {
+        try{
 
-        if((currentTime - new Date(time)) < FIVE_MIN) {
+        if((currentTime - time) < (5 * 60)) {
            if(bitcoinMessage.verify(message, address, signature)) {
                 // If the Bitcoin message verify returns true
                 const blockData = {"owner": address, "star": star}
                 const myBlock = new BlockClass.Block(blockData)
-                self._addBlock(myBlock)
-                resolve(myBlock)
+                let result = await self._addBlock(myBlock)
+                resolve(result)
            } else {
                reject(`Message Could Not Be Verified`)
            }
         } else {
             reject(`Older than five minutes`)
         }
-            
-        })
+    } catch (error) {
+        reject(`Oops! Error submitting star`)
+    }
+    })
 
     }
 
@@ -215,32 +214,24 @@ class Blockchain {
      */
 
     
-    validateChain() {
+    async validateChain() {
         let self = this;
-        let errorLog = [];
-        return new Promise(async (resolve, reject) => {
-            console.log(`Validate Chain Triggered`)
+        let errorLog = [];       
             try {
                 self.chain.map((currentBlock, index, arr) => {
                     if (currentBlock.height === 0) {
                         currentBlock.validate() ? console.log(`Genesis Hashes Validation Passed`) : errorLog.push(currentBlock)
                     } else {
-                        console.log(`Index: ${index} - Arr - ${currentBlock.previousBlockHash} - ${arr[index - 1].hash}`)
                         currentBlock.validate() ? console.log(`Block Validation Passed`) : console.log(`Block Validation Failed`)
-                        currentBlock.previousBlockHash !== arr[index - 1].hash ? console.log(`Hashes Dont Match`) : errorLog.push(currentBlock)
+                        currentBlock.previousBlockHash !== arr[index - 1].hash ? errorLog.push(currentBlock) : console.log(`Hashes Match`)
                     }
                 })   
-                // If there are any errors, return the array of errors, else, return true
-                if (errorLog.length === 0) {
-                    resolve(true)
-                } else {
-                    reject(errorLog) 
-                }
+                // An empty array will have no errors - any value found will mean there is an issue with the Blockchain
+                return errorLog
             } catch(error){
-                console.log(`Error: ${error}`)
+                console.log(`There was an error: ${error}`)
             }
-            }
-        )
+            
     }
 }
 
