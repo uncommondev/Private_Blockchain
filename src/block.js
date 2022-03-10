@@ -38,6 +38,7 @@ class Block {
     validate() {
         let self = this;
         return new Promise((resolve, reject) => {
+            try {
             // Save in auxiliary variable the current block hash
             let currentHash = self.hash                                    
             // Recalculate the hash of the Block
@@ -45,11 +46,30 @@ class Block {
             // Returning the Block is not valid
             if (currentHash === SHA256(self)) {
                 // Returning the Block is valid
+                self.hash === SHA256(
+                    JSON.stringify(
+                        {
+                            ...self,
+                            "hash": null
+                        }
+                    )
+                ).toString();
                 resolve(true)
             }
             else {
+                self.hash === SHA256(
+                    JSON.stringify(
+                        {
+                            ...self,
+                            "hash": null
+                        }
+                    )
+                ).toString();
                 reject(false)
-            }      
+            } 
+        } catch (error) {
+            console.log(`There was an error validating the Block: ${error}`)
+        }    
         });
     }
 
