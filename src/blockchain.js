@@ -37,10 +37,15 @@ class Blockchain {
      * Passing as a data `{data: 'Genesis Block'}`
      */
     async initializeChain() {
-        if( this.height === -1){
+        try {
+            if( this.height === -1){
             let block = new BlockClass.Block({data: 'Genesis Block'});
             await this._addBlock(block);
+            }
+        } catch(error){
+            console.log(`There was an error initializing the Blockchain: ${error}`)
         }
+
     }
 
     /**
@@ -77,10 +82,12 @@ class Blockchain {
                 let result = await self.validateChain()
                 // If result.length is greater than 0, it means the Blockchain could not be validated
                 if (self.chain.length !== 0 && result.length === 0) {
-                    resolve(self.chain.push(block))
+                    self.chain.push(block)
+                    resolve(block)
                 } else if (self.chain.length === 0) {
                     // For the Genesis Block, there will be nothing validate
-                    resolve(self.chain.push(block))
+                    self.chain.push(block)
+                    resolve(block)
                 } 
                 else {
                     reject (`There was an error validating the chain`)
@@ -145,7 +152,8 @@ class Blockchain {
             reject(`Older than five minutes`)
         }
     } catch (error) {
-        reject(`Oops! Error submitting star`)
+        reject(`Oops! Error submitting star: ${error}`)
+        console.log(`Error Submitting Star: ${error}`)
     }
     })
 
@@ -219,12 +227,16 @@ class Blockchain {
         let errorLog = [];       
             try {
                 self.chain.map((currentBlock, index, arr) => {
+                    currentBlock.validate().then((validationValue) => {
+                                            
                     if (currentBlock.height === 0) {
-                        currentBlock.validate() ? console.log(`Genesis Hashes Validation Passed`) : errorLog.push(currentBlock)
+                        validationValue ? console.log(`Genesis Hashes Validation Passed`) : errorLog.push(currentBlock)
                     } else {
-                        currentBlock.validate() ? console.log(`Block Validation Passed`) : console.log(`Block Validation Failed`)
+                        validationValue ? console.log(`Block Validation Passed`) : console.log(`Block Validation Failed`)
                         currentBlock.previousBlockHash !== arr[index - 1].hash ? errorLog.push(currentBlock) : console.log(`Hashes Match`)
                     }
+                    })
+
                 })   
                 // An empty array will have no errors - any value found will mean there is an issue with the Blockchain
                 return errorLog

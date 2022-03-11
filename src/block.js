@@ -37,37 +37,12 @@ class Block {
      */
     validate() {
         let self = this;
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             try {
-            // Save in auxiliary variable the current block hash
-            let currentHash = self.hash                                    
-            // Recalculate the hash of the Block
-            // Comparing if the hashes changed
-            // Returning the Block is not valid
-            if (currentHash === SHA256(self)) {
-                // Returning the Block is valid
-                self.hash === SHA256(
-                    JSON.stringify(
-                        {
-                            ...self,
-                            "hash": null
-                        }
-                    )
-                ).toString();
-                resolve(true)
-            }
-            else {
-                self.hash === SHA256(
-                    JSON.stringify(
-                        {
-                            ...self,
-                            "hash": null
-                        }
-                    )
-                ).toString();
-                reject(false)
-            } 
-        } catch (error) {
+                let clonedBlock = {...self, hash: null};
+                let newHash = SHA256(JSON.stringify(clonedBlock)).toString();
+                resolve(self.hash === newHash);
+            } catch (error) {
             console.log(`There was an error validating the Block: ${error}`)
         }    
         });
@@ -88,11 +63,11 @@ class Block {
         // Parse the data to an object to be retrieve.
         let self = this;
         return new Promise((resolve, reject) => {
-            if (self.height === 1) {
+            if (self.height === 0) {
                 // Resolve with the data if the object isn't the Genesis block
                 reject(`Error`)
             }
-                resolve(JSON.parse(hex2ascii(self)))
+            resolve(JSON.parse(hex2ascii(self.body)))
         })
     }
 
